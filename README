@@ -1,0 +1,211 @@
+orlykor12, idan0610
+Idan Refaeli (305681132), Orly Koren (203595541)
+EX: 3
+
+FILES:
+README -- This file
+Makefile -- Makefile of the project
+Search.cpp -- simple use of the MapReduceFramework to search file whose name
+contains the input word.
+MapReduceFramework.cpp -- The MapReduceFramework library.
+
+REMARKS:
+Explaining our design of the Search file:
+k1 represents the folder name, v1 represents the search word argument, k2 
+represents a fileName, v2 is a flag with the value of 1, k3 represents FileName
+which contains the search word argument, and v3 represents the number of times
+that a file with that name appears.
+The Map function gets as arguments folderName and a search word argument, 
+and then for each file in the folder it creates a pair of (k2,v2) and sends it 
+to the emit2 function(the search word is being saved inside the k2 object).
+The Reduce function gets as arguments a fileName and a list of 1's for each 
+appearence of the file. it checks whether the search word appears in the 
+fileName and if so it creates a pair of (k3, v3) where k3 is the fileName and 
+v3 is the amount of flags- the number of times the file with that name appears.
+finally, it sends it to the emit3 function.
+The main recives the list of (k3,v3) pairs and prints out k3, v3-times.    
+
+
+ANSWERS:
+Q1:
+the way we would implement it is:
+we will use a pipe for each execMap thread- the ExecMap threads will write to 
+thier pipe, and the shuffle will read from each pipe.
+we will implement it the same way as we did in the exercise. we will have an
+unordered map, with item for each thread, where the key is pthread_t and the
+value is a pair of file descriptors - the first element refers to the write 
+end of the pipe (the execMap thread) and the second element refers to the read
+end of the pipe (the shuffle thread).
+each ExecMap thread writes a chunk of <k2*,v2*> to its pipe.
+The shuffle will use the select function: the fd_set *read-fds argument is the
+set of all the fd of the shuffle, the fd_set *write-fds is the set of all the
+ExecMap threads. and in the struct timeval *timeout we will put the time the 
+shuffle will wait for recieving information from the ExecMap threads.
+the shuffle will read <k2*,v2*> from the pipes until all the threads finished
+and closed their fd using close(), so the shuffle gets EOF.
+
+Q2:
+Assuming that a user wants to run the MapReduceFramework on his personal 
+computer, which contains octa-cores but without hyper-threading support, which 
+means that each core processor can execute one thread(rather than two 
+concurrent threads), the optimal value of multiThreadLevel will be 6.
+the reason is that one core execute the main thread, another core will execute
+the shuffle, and remain cores(6) will execute the ExecMap and ExecReduce 
+threads. 
+that way we ensure that there is no thread that is on hold for its job to be
+done.
+
+Q3:
+
+a. Utilizing multi-cores:
+ 1. Nira- nira won't utilize the multi-cores because her whole program runs on 
+ a single thread and therefore, the procces will use only one core instead of
+ using all the cores.
+ 2. Moti- moti will utilize the multi-cores. Moti uses the kernel-level threads
+ that utilize the multi-cores that way that each thread runs on a different 
+ core.
+ 3. Danny- won't utilize. the same way as Nira, using the user level threads 
+ only use one core.
+ 4. Galit - utilize. she will use all the cores beacuse each process runs on 
+ a different core.
+ 
+ b. The ability to create a sophisticated scheduler, based on internal data:
+ 1. Nira - does not have the ability to create a sophisticated scheduler,  
+ because she is using a single thread and there is no scheduler needed.
+ 2. Moti- does not have the ability to create a sophisticated scheduler, 
+ because the OS controls it.
+ 3. Danny- has the ability to create a sophisticated scheduler, because the 
+ user controls the schdueling between threads (as we did in ex2).
+ 4. Galit - does not have the ability to create a sophisticated scheduler, 
+ because the OS controls it.
+ 
+ c. Communication time -
+ 1. Nira- no communication time, since there is only one thread.
+ 2. Moti - has a short communication time, since all the threads share address
+ space, means share heap and global variables. 
+ 3. Danny- same as Moti.
+ 4. Galit - long communication time, since each process is protected from the 
+ other, and therefore, the communication between the processes require the OS
+ to communicate. 
+ 
+ d. Ability to progress while a certain thread/process is blocked- 
+ 1. Nira - she won't have the ability to progress while a certain 
+ thread/process is blocked since it will block the whole program that runs on 
+ a single thread.
+ 2. Moti - will have no problems, since blocking one thread wont block the 
+ others, so his program will continue run the other threads.
+ 3. Danny- the same as Nire, since the OS is not aware of the fact that there 
+ are multiple user level threads, and refers to them as one thread. so blocking
+ one user level thread, is like blocking the whole procces.
+ 4. Galit - her program will have no problems, since blocking one process wont
+ block the others from running. 
+ 
+ e. Overall speed- 
+ we will refer to two different situations: 1. single-core 
+ 2. multi-core
+ 
+ single-core: 
+ 1. Nira - the overall speed is not so bad, since the single-core doen't limit 
+ her process as her program already runs on a single core.  
+ 2. Moti - the overall speed is worse than Nira, since the context-switch 
+ between kernel level thread is exepensive, and happens a lot.
+ 3. Danny- approximately the same overall speed as Nira, since on one hand, 
+ all the user-level threads split the job between them, but on the other hand,
+ there can be a lot of context switch which takes time.
+ 4. Galit - the worst overall speed, since it take a lot of time to do context
+ switch between processes and it happens a lot with a single-core.
+ 
+ multi-core:
+ 1. Nira - the overall speed considered the others, is not so good, because she
+ doesn't utilize the multi-core to speed up her program.
+ 2. Moti - the best overall speed, since there can be threads that run 
+ concurently, so there is less context switch. Muchmore, the communication 
+ between the threads is cheap. 
+ 3. Danny - worse then Moti, since user level threads don't run concourently, 
+ as the OS sees them as a one thread. 
+ 4. Galit - the worst overall speed, since meanwhile processes can run 
+ concourently, context switch between them is very exepensive and also the 
+ communication time between them is high.     
+ 
+ Q4:
+ a. kernel-level thread:
+ the only thing that is not shared between the parent and its child is the 
+ stack, since every thread has its own stack.
+ b. user-level thread:
+  the only thing that is not shared between the parent and its child is the 
+ stack. but actually, the process that runs the threads has only one stack, so
+ each user level thread gets it's own memory allocation that is used as its own
+ stack. 
+ c. process:
+ None of the amongst are common between the parent and child processes,
+ because each child process creates a copy of the global variables of its
+ parent. 
+ 
+ Q5:
+ Deadlock:
+ Deadlock is a condition in which 2 threads/processes waits indefinitely for 
+ conditions that can never be satisfied - they get blockes, since they block
+ each other progress. that can happen by sharing the same two resources(x,y): 
+ one thread/process holds a lock on x and request a lock on y, while the second
+ thread/process hold the lock on y and request the lock on x. none will release
+ the lock until it will get the requested lock, so it will cause both of them
+ to be blocked.
+ 
+ Livelock:
+ A livelock is similar to a deadlock, except that the states of the processes 
+ involved in the livelock are not blocked and constantly change with regard to 
+ one another. Moreover, livelock may happen when trying to avoid from deadlock,
+ where each thread/process gives up on his lock to the other, and still none of 
+ them may procced.
+ example: 
+ A real-world example of livelock occurs when two people meet in a narrow 
+ corridor, and each tries to be polite by moving aside to let the other pass, 
+ but they end up swaying from side to side without making any progress because 
+ they both repeatedly move the same way at the same time.
+ 
+ Q6:
+ 1. Round Robin:
+  Turnaround time:
+  18+2+4+19+4 = 47. 47/5 = 9.4
+  Average wait time:
+  8+1+2+7+3 = 21. 21/5 = 4.2
+ 
+ 2. First Come First Serve:
+  Turnaround time: 
+  10+10+10+18+18 = 66. 66/5 = 13.2
+  Average wait time:
+  0+9+8+6+17 = 40. 40/5 = 8.
+  
+  3. Shortest Remaining Time First:
+    Turnaround time:
+    14+1+2+2+19+1 = 37. 37/5 = 7.4
+    Average wait time:
+    4+0+0+7+0 = 11. 11/5 = 2.2
+    
+  4. Priority Scheduling:
+     Turnaround time:
+     25+1+2+12+18 = 58. 58/5 = 11.6
+     Average wait time:
+     15+0+0+0+17 = 32. 32/5 = 6.4
+     
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
